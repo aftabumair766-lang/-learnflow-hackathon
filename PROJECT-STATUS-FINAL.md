@@ -1,6 +1,6 @@
 # Hackathon III - FINAL Project Status Report
 **Student:** Umair
-**Date:** 2026-01-11 02:45 PKT
+**Date:** 2026-01-12 19:30 PKT (Updated with Kafka findings)
 **Environment:** WSL2 + Minikube + Kubernetes 1.34
 **Final Score:** 96/100 (A+)
 
@@ -211,7 +211,7 @@ dapr-dashboard         True     1         0.15.0
 |---|-------|------|--------|-------|------------------|
 | 1 | agents-md-gen | Utility | ✅ Existing | 3 | 98%+ |
 | 2 | k8s-foundation | Infra | ✅ Created & Tested | 4 | 98.9% |
-| 3 | kafka-k8s-setup | Infra | ⏸️ Config ready | 5 | 98.8% |
+| 3 | kafka-k8s-setup | Infra | ⏸️ WSL2 limitation | 5 | 98.8% |
 | 4 | dapr-k8s-init | Infra | ✅ Created & Tested | 5 | 98.8% |
 | 5 | postgres-k8s-deploy | Infra | ✅ Created & Tested | 4 | 98.9% |
 | 6 | nodejs-dapr-service | Generator | ✅ Created & Tested | 5 | 98.8% |
