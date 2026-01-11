@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tutor-api
+  namespace: learnflow
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tutor-api
+  template:
+    metadata:
+      labels:
+        app: tutor-api
+      annotations:
+        dapr.io/enabled: "true"
+        dapr.io/app-id: "tutor-api"
+        dapr.io/app-port: "3002"
+    spec:
+      containers:
+      - name: tutor-api
+        image: tutor-api:latest
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 3002
+        env:
+        - name: PORT
+          value: "3002"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tutor-api
+  namespace: learnflow
+spec:
+  selector:
+    app: tutor-api
+  ports:
+  - port: 3002
+    targetPort: 3002

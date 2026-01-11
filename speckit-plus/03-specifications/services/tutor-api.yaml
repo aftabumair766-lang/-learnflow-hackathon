@@ -1,0 +1,188 @@
+---
+# Tutor API Service Specification
+specVersion: "1.0"
+service: tutor-api
+type: microservice
+
+# Service Identity
+metadata:
+  name: tutor-api
+  description: "Manages tutor registrations, profiles, and availability"
+  port: 3002
+  namespace: learnflow
+
+# Technology
+technology:
+  language: nodejs
+  framework: express
+  container: node:20-alpine
+
+# Database
+database:
+  name: tutors_db
+  type: postgresql
+  host: postgres-tutors.learnflow.svc.cluster.local
+  port: 5432
+  schema:
+    - table: tutors
+      columns:
+        - id: SERIAL PRIMARY KEY
+        - name: VARCHAR(255) NOT NULL
+        - email: VARCHAR(255) UNIQUE NOT NULL
+        - expertise: TEXT[] NOT NULL
+        - availability: JSONB
+        - is_available: BOOLEAN DEFAULT true
+        - created_at: TIMESTAMP DEFAULT NOW()
+
+# API Endpoints
+endpoints:
+  - path: /health
+    method: GET
+    description: Health check endpoint
+    response:
+      status: 200
+      body: { "status": "healthy" }
+
+  - path: /api/tutors
+    method: POST
+    description: Register a new tutor
+    request:
+      body:
+        name: string (required)
+        email: string (required)
+        expertise: array of strings (required)
+        availability: object
+    response:
+      status: 201
+      body:
+        id: integer
+        name: string
+        email: string
+        expertise: array
+        availability: object
+        is_available: boolean
+        created_at: timestamp
+    events:
+      publish: tutor.registered
+
+  - path: /api/tutors
+    method: GET
+    description: Get all tutors
+    query:
+      available: boolean (optional)
+      subject: string (optional)
+    response:
+      status: 200
+      body: array of tutor objects
+
+  - path: /api/tutors/:id
+    method: GET
+    description: Get tutor by ID
+    response:
+      status: 200
+      body: tutor object
+
+  - path: /api/tutors/:id/availability
+    method: PUT
+    description: Update tutor availability
+    request:
+      body:
+        is_available: boolean
+        availability: object
+    response:
+      status: 200
+      body: updated tutor object
+    events:
+      publish: tutor.availability.updated
+
+# Events
+events:
+  publishes:
+    - topic: tutor.events
+      event: tutor.registered
+      payload:
+        tutor_id: integer
+        name: string
+        email: string
+        expertise: array
+        timestamp: timestamp
+
+    - topic: tutor.events
+      event: tutor.availability.updated
+      payload:
+        tutor_id: integer
+        is_available: boolean
+        availability: object
+        timestamp: timestamp
+
+  consumes:
+    - topic: matching.events
+      event: match.created
+      action: Update tutor record with match info
+
+# Dapr Configuration
+dapr:
+  appId: tutor-api
+  appPort: 3002
+  components:
+    - pubsub:
+        name: kafka-pubsub
+        type: pubsub.kafka
+        metadata:
+          brokers: kafka.kafka.svc.cluster.local:9092
+          consumerGroup: tutor-api-group
+
+    - statestore:
+        name: postgres-state
+        type: state.postgresql
+        metadata:
+          connectionString: "host=postgres-tutors.learnflow.svc.cluster.local user=postgres password=postgres dbname=tutors_db"
+
+# Environment Variables
+env:
+  - DAPR_HTTP_PORT: "3500"
+  - KAFKA_BROKER: "kafka.kafka.svc.cluster.local:9092"
+  - DB_HOST: "postgres-tutors.learnflow.svc.cluster.local"
+  - DB_PORT: "5432"
+  - DB_NAME: "tutors_db"
+  - DB_USER: "postgres"
+  - DB_PASSWORD: "postgres"
+
+# Container Specification
+container:
+  image: tutor-api:latest
+  ports:
+    - containerPort: 3002
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  livenessProbe:
+    httpGet:
+      path: /health
+      port: 3002
+    initialDelaySeconds: 10
+    periodSeconds: 10
+  readinessProbe:
+    httpGet:
+      path: /health
+      port: 3002
+    initialDelaySeconds: 5
+    periodSeconds: 5
+
+# Dependencies
+dependencies:
+  - postgres-tutors (database)
+  - kafka (message broker)
+  - dapr (runtime)
+
+# Skill Generation
+generatedBy: nodejs-dapr-service
+skillInput:
+  serviceName: tutor-api
+  port: 3002
+  endpoints: (as defined above)
+  events: (as defined above)

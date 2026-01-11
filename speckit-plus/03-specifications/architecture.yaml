@@ -1,0 +1,211 @@
+---
+# LearnFlow System Architecture Specification
+specVersion: "1.0"
+project: learnflow
+type: event-driven-microservices
+
+# High-Level Architecture
+architecture:
+  pattern: microservices
+  communication: event-driven
+  runtime: dapr
+  eventBus: kafka
+  orchestration: kubernetes
+  deployment: minikube
+
+# Technology Stack
+stack:
+  frontend:
+    framework: nextjs
+    version: "14.x"
+    language: typescript
+    port: 3000
+    container: node:20-alpine
+
+  backend:
+    language: nodejs
+    version: "20.x"
+    framework: express
+    container: node:20-alpine
+
+  database:
+    engine: postgresql
+    version: "15"
+    deployment: kubernetes
+
+  messaging:
+    platform: kafka
+    version: "3.6.0"
+    chart: bitnami/kafka
+    namespace: kafka
+
+  serviceMesh:
+    runtime: dapr
+    version: "1.12+"
+    namespace: dapr-system
+
+# Service Inventory
+services:
+  - name: student-api
+    type: backend
+    port: 3001
+    database: students_db
+    spec: services/student-api.yaml
+
+  - name: tutor-api
+    type: backend
+    port: 3002
+    database: tutors_db
+    spec: services/tutor-api.yaml
+
+  - name: matching-service
+    type: backend
+    port: 3003
+    database: matching_db
+    spec: services/matching-service.yaml
+
+  - name: learnflow-web
+    type: frontend
+    port: 3000
+    spec: frontend/learnflow-web.yaml
+
+# Infrastructure Components
+infrastructure:
+  - name: kafka
+    type: message-broker
+    namespace: kafka
+    chart: bitnami/kafka
+    replicas: 1
+    spec: infrastructure/kafka.yaml
+
+  - name: dapr
+    type: service-mesh
+    namespace: dapr-system
+    spec: infrastructure/dapr.yaml
+
+  - name: postgresql-students
+    type: database
+    namespace: learnflow
+    database: students_db
+    spec: infrastructure/postgresql.yaml
+
+  - name: postgresql-tutors
+    type: database
+    namespace: learnflow
+    database: tutors_db
+    spec: infrastructure/postgresql.yaml
+
+  - name: postgresql-matching
+    type: database
+    namespace: learnflow
+    database: matching_db
+    spec: infrastructure/postgresql.yaml
+
+# Event Architecture
+events:
+  topics:
+    - name: student.events
+      partitions: 3
+      replication: 1
+      producers:
+        - student-api
+      consumers:
+        - matching-service
+
+    - name: tutor.events
+      partitions: 3
+      replication: 1
+      producers:
+        - tutor-api
+      consumers:
+        - matching-service
+
+    - name: matching.events
+      partitions: 3
+      replication: 1
+      producers:
+        - matching-service
+      consumers:
+        - student-api
+        - tutor-api
+        - learnflow-web
+
+# Data Flow
+dataFlow:
+  studentRegistration:
+    - student registers via learnflow-web
+    - POST /api/students → student-api
+    - student-api saves to students_db
+    - student-api publishes student.registered event
+    - frontend shows confirmation
+
+  tutorRegistration:
+    - tutor registers via learnflow-web
+    - POST /api/tutors → tutor-api
+    - tutor-api saves to tutors_db
+    - tutor-api publishes tutor.registered event
+    - frontend shows confirmation
+
+  matchingFlow:
+    - student requests tutor via frontend
+    - student-api publishes tutor.requested event
+    - matching-service consumes event
+    - matching-service queries tutors_db for available tutors
+    - matching-service creates match
+    - matching-service publishes match.created event
+    - frontend displays match to both student and tutor
+
+# Network Architecture
+networking:
+  internal:
+    - service-to-service via Dapr service invocation
+    - events via Kafka (Dapr pub/sub)
+    - databases via K8s service DNS
+
+  external:
+    - frontend accessible via kubectl port-forward 3000:3000
+    - (optional) Ingress for production
+
+# Security (Simplified for Hackathon)
+security:
+  authentication: none  # Out of scope
+  authorization: none   # Out of scope
+  tls: false           # Not required for Minikube
+
+# Deployment Strategy
+deployment:
+  namespace: learnflow
+  strategy: rolling-update
+  healthChecks: true
+  readinessProbes: true
+
+# Resource Requirements
+resources:
+  minikube:
+    cpus: 4
+    memory: 8192  # 8GB
+    driver: docker
+
+  services:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+# Development Workflow
+workflow:
+  1_specs: "Define all specs (this directory)"
+  2_skills: "Create reusable Skills"
+  3_generate: "AI generates code via Skills"
+  4_deploy: "Skills deploy to K8s"
+  5_verify: "Automated verification"
+
+# Validation Rules
+validation:
+  - all_services_use_dapr: true
+  - all_events_use_kafka: true
+  - all_databases_are_postgresql: true
+  - all_ports_are_unique: true
+  - no_manual_code_allowed: true

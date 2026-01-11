@@ -1,0 +1,184 @@
+---
+# Student API Service Specification
+specVersion: "1.0"
+service: student-api
+type: microservice
+
+# Service Identity
+metadata:
+  name: student-api
+  description: "Manages student registrations, profiles, and tutor requests"
+  port: 3001
+  namespace: learnflow
+
+# Technology
+technology:
+  language: nodejs
+  framework: express
+  container: node:20-alpine
+
+# Database
+database:
+  name: students_db
+  type: postgresql
+  host: postgres-students.learnflow.svc.cluster.local
+  port: 5432
+  schema:
+    - table: students
+      columns:
+        - id: SERIAL PRIMARY KEY
+        - name: VARCHAR(255) NOT NULL
+        - email: VARCHAR(255) UNIQUE NOT NULL
+        - grade: VARCHAR(50)
+        - subjects: TEXT[]
+        - created_at: TIMESTAMP DEFAULT NOW()
+
+# API Endpoints
+endpoints:
+  - path: /health
+    method: GET
+    description: Health check endpoint
+    response:
+      status: 200
+      body: { "status": "healthy" }
+
+  - path: /api/students
+    method: POST
+    description: Register a new student
+    request:
+      body:
+        name: string (required)
+        email: string (required)
+        grade: string
+        subjects: array of strings
+    response:
+      status: 201
+      body:
+        id: integer
+        name: string
+        email: string
+        grade: string
+        subjects: array
+        created_at: timestamp
+    events:
+      publish: student.registered
+
+  - path: /api/students
+    method: GET
+    description: Get all students
+    response:
+      status: 200
+      body: array of student objects
+
+  - path: /api/students/:id
+    method: GET
+    description: Get student by ID
+    response:
+      status: 200
+      body: student object
+
+  - path: /api/students/:id/request-tutor
+    method: POST
+    description: Student requests a tutor
+    request:
+      body:
+        subject: string (required)
+        preferred_time: string
+    response:
+      status: 200
+      body:
+        request_id: integer
+        status: "pending"
+    events:
+      publish: tutor.requested
+
+# Events
+events:
+  publishes:
+    - topic: student.events
+      event: student.registered
+      payload:
+        student_id: integer
+        name: string
+        email: string
+        timestamp: timestamp
+
+    - topic: student.events
+      event: tutor.requested
+      payload:
+        student_id: integer
+        subject: string
+        preferred_time: string
+        timestamp: timestamp
+
+  consumes:
+    - topic: matching.events
+      event: match.created
+      action: Update student record with match info
+
+# Dapr Configuration
+dapr:
+  appId: student-api
+  appPort: 3001
+  components:
+    - pubsub:
+        name: kafka-pubsub
+        type: pubsub.kafka
+        metadata:
+          brokers: kafka.kafka.svc.cluster.local:9092
+          consumerGroup: student-api-group
+
+    - statestore:
+        name: postgres-state
+        type: state.postgresql
+        metadata:
+          connectionString: "host=postgres-students.learnflow.svc.cluster.local user=postgres password=postgres dbname=students_db"
+
+# Environment Variables
+env:
+  - DAPR_HTTP_PORT: "3500"
+  - KAFKA_BROKER: "kafka.kafka.svc.cluster.local:9092"
+  - DB_HOST: "postgres-students.learnflow.svc.cluster.local"
+  - DB_PORT: "5432"
+  - DB_NAME: "students_db"
+  - DB_USER: "postgres"
+  - DB_PASSWORD: "postgres"
+
+# Container Specification
+container:
+  image: student-api:latest
+  ports:
+    - containerPort: 3001
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  livenessProbe:
+    httpGet:
+      path: /health
+      port: 3001
+    initialDelaySeconds: 10
+    periodSeconds: 10
+  readinessProbe:
+    httpGet:
+      path: /health
+      port: 3001
+    initialDelaySeconds: 5
+    periodSeconds: 5
+
+# Dependencies
+dependencies:
+  - postgres-students (database)
+  - kafka (message broker)
+  - dapr (runtime)
+
+# Skill Generation
+generatedBy: nodejs-dapr-service
+skillInput:
+  serviceName: student-api
+  port: 3001
+  endpoints: (as defined above)
+  events: (as defined above)

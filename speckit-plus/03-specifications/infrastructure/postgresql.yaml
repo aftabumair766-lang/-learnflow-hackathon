@@ -1,0 +1,95 @@
+---
+# PostgreSQL Infrastructure Specification
+specVersion: "1.0"
+component: postgresql
+type: database
+
+# Component Identity
+metadata:
+  name: postgresql
+  description: "PostgreSQL databases for LearnFlow services"
+  namespace: learnflow
+
+# Deployment Strategy
+deployment:
+  method: helm
+  chart: bitnami/postgresql
+  version: latest
+  repoUrl: https://charts.bitnami.com/bitnami
+
+# Database Instances
+instances:
+  - name: postgres-students
+    database: students_db
+    user: postgres
+    password: postgres  # Dev only - use secrets in production
+    port: 5432
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    persistence:
+      enabled: false  # Ephemeral for dev
+
+  - name: postgres-tutors
+    database: tutors_db
+    user: postgres
+    password: postgres
+    port: 5432
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    persistence:
+      enabled: false
+
+  - name: postgres-matching
+    database: matching_db
+    user: postgres
+    password: postgres
+    port: 5432
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    persistence:
+      enabled: false
+
+# Service Endpoints
+services:
+  - name: postgres-students
+    type: ClusterIP
+    port: 5432
+    dnsName: postgres-students.learnflow.svc.cluster.local
+
+  - name: postgres-tutors
+    type: ClusterIP
+    port: 5432
+    dnsName: postgres-tutors.learnflow.svc.cluster.local
+
+  - name: postgres-matching
+    type: ClusterIP
+    port: 5432
+    dnsName: postgres-matching.learnflow.svc.cluster.local
+
+# Verification
+verification:
+  - check: PostgreSQL pods Running
+    command: kubectl get pods -n learnflow -l app.kubernetes.io/name=postgresql
+  - check: Can connect to database
+    command: kubectl exec -n learnflow <pod-name> -- psql -U postgres -c "SELECT 1"
+
+# Dependencies
+dependencies: []
+
+# Skill
+deployedBy: postgres-k8s-deploy

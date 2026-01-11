@@ -1,0 +1,18 @@
+frontend: learnflow-web
+metadata:
+  port: 3000
+  framework: nextjs
+  version: 14.0.0
+
+pages:
+  - path: /
+    name: Home
+    description: Landing page
+
+services:
+  student-api:
+    baseUrl: http://student-api:3001
+  tutor-api:
+    baseUrl: http://tutor-api:3002
+  matching-service:
+    baseUrl: http://matching-service:3003

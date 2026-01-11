@@ -1,0 +1,30 @@
+apiVersion: kafka.strimzi.io/v1
+kind: Kafka
+metadata:
+  name: my-kafka
+  namespace: kafka
+spec:
+  kafka:
+    version: 3.5.0
+    replicas: 1
+    listeners:
+      - name: plain
+        port: 9092
+        type: internal
+        tls: false
+    template:
+      broker:
+        image: bitnami/kafka:latest
+    storage:
+      type: ephemeral
+  zookeeper:
+    replicas: 1
+    template:
+      zooKeeper:
+        image: bitnami/zookeeper:latest
+    storage:
+      type: ephemeral
+  entityOperator:
+    topicOperator: {}
+    userOperator: {}
+

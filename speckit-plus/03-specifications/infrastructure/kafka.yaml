@@ -1,0 +1,76 @@
+---
+# Kafka Infrastructure Specification
+specVersion: "1.0"
+component: kafka
+type: message-broker
+
+# Component Identity
+metadata:
+  name: kafka
+  description: "Apache Kafka event streaming platform"
+  namespace: kafka
+
+# Deployment
+deployment:
+  method: helm
+  chart: bitnami/kafka
+  version: latest
+  repoUrl: https://charts.bitnami.com/bitnami
+
+# Configuration
+configuration:
+  replicas: 1
+  zookeeper:
+    enabled: true
+    replicas: 1
+  persistence:
+    enabled: false  # Ephemeral storage for dev
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+
+# Topics (created after deployment)
+topics:
+  - name: student.events
+    partitions: 3
+    replicationFactor: 1
+    retentionMs: 86400000  # 24 hours
+
+  - name: tutor.events
+    partitions: 3
+    replicationFactor: 1
+    retentionMs: 86400000
+
+  - name: matching.events
+    partitions: 3
+    replicationFactor: 1
+    retentionMs: 86400000
+
+# Service Endpoints
+service:
+  name: kafka
+  type: ClusterIP
+  ports:
+    - name: client
+      port: 9092
+      targetPort: 9092
+  dnsName: kafka.kafka.svc.cluster.local
+
+# Verification
+verification:
+  - check: Kafka pod Running
+    command: kubectl get pods -n kafka -l app.kubernetes.io/name=kafka
+  - check: Kafka service exists
+    command: kubectl get svc kafka -n kafka
+  - check: Can create test topic
+    command: kubectl exec -n kafka kafka-0 -- kafka-topics.sh --create --topic test --bootstrap-server localhost:9092
+
+# Dependencies
+dependencies: []
+
+# Skill
+deployedBy: kafka-k8s-setup

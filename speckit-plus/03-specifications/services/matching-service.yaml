@@ -1,0 +1,169 @@
+---
+# Matching Service Specification
+specVersion: "1.0"
+service: matching-service
+type: microservice
+
+# Service Identity
+metadata:
+  name: matching-service
+  description: "Intelligently matches students with available tutors"
+  port: 3003
+  namespace: learnflow
+
+# Technology
+technology:
+  language: nodejs
+  framework: express
+  container: node:20-alpine
+
+# Database
+database:
+  name: matching_db
+  type: postgresql
+  host: postgres-matching.learnflow.svc.cluster.local
+  port: 5432
+  schema:
+    - table: matches
+      columns:
+        - id: SERIAL PRIMARY KEY
+        - student_id: INTEGER NOT NULL
+        - tutor_id: INTEGER NOT NULL
+        - subject: VARCHAR(255) NOT NULL
+        - status: VARCHAR(50) DEFAULT 'active'
+        - matched_at: TIMESTAMP DEFAULT NOW()
+
+# API Endpoints
+endpoints:
+  - path: /health
+    method: GET
+    description: Health check endpoint
+    response:
+      status: 200
+      body: { "status": "healthy" }
+
+  - path: /api/matches
+    method: GET
+    description: Get all matches
+    query:
+      student_id: integer (optional)
+      tutor_id: integer (optional)
+      status: string (optional)
+    response:
+      status: 200
+      body: array of match objects
+
+  - path: /api/matches/:id
+    method: GET
+    description: Get match by ID
+    response:
+      status: 200
+      body: match object
+
+# Events
+events:
+  consumes:
+    - topic: student.events
+      event: tutor.requested
+      action: |
+        1. Receive tutor request from student
+        2. Query available tutors from tutor-api via Dapr
+        3. Apply matching algorithm (subject match, availability)
+        4. Create match record in matching_db
+        5. Publish match.created event
+
+  publishes:
+    - topic: matching.events
+      event: match.created
+      payload:
+        match_id: integer
+        student_id: integer
+        tutor_id: integer
+        subject: string
+        matched_at: timestamp
+
+# Matching Algorithm (Simple)
+algorithm:
+  steps:
+    - Filter tutors by subject expertise
+    - Filter by is_available = true
+    - Select first available tutor
+    - Create match
+    - Publish event
+
+# Dapr Configuration
+dapr:
+  appId: matching-service
+  appPort: 3003
+  components:
+    - pubsub:
+        name: kafka-pubsub
+        type: pubsub.kafka
+        metadata:
+          brokers: kafka.kafka.svc.cluster.local:9092
+          consumerGroup: matching-service-group
+
+    - statestore:
+        name: postgres-state
+        type: state.postgresql
+        metadata:
+          connectionString: "host=postgres-matching.learnflow.svc.cluster.local user=postgres password=postgres dbname=matching_db"
+
+# Service Invocation (Dapr)
+serviceInvocation:
+  - service: tutor-api
+    method: GET
+    endpoint: /api/tutors
+    purpose: Query available tutors for matching
+
+# Environment Variables
+env:
+  - DAPR_HTTP_PORT: "3500"
+  - KAFKA_BROKER: "kafka.kafka.svc.cluster.local:9092"
+  - DB_HOST: "postgres-matching.learnflow.svc.cluster.local"
+  - DB_PORT: "5432"
+  - DB_NAME: "matching_db"
+  - DB_USER: "postgres"
+  - DB_PASSWORD: "postgres"
+  - TUTOR_API_URL: "http://localhost:3500/v1.0/invoke/tutor-api/method"
+
+# Container Specification
+container:
+  image: matching-service:latest
+  ports:
+    - containerPort: 3003
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  livenessProbe:
+    httpGet:
+      path: /health
+      port: 3003
+    initialDelaySeconds: 10
+    periodSeconds: 10
+  readinessProbe:
+    httpGet:
+      path: /health
+      port: 3003
+    initialDelaySeconds: 5
+    periodSeconds: 5
+
+# Dependencies
+dependencies:
+  - postgres-matching (database)
+  - kafka (message broker)
+  - dapr (runtime)
+  - tutor-api (service invocation)
+
+# Skill Generation
+generatedBy: nodejs-dapr-service
+skillInput:
+  serviceName: matching-service
+  port: 3003
+  endpoints: (as defined above)
+  events: (as defined above)
+  serviceInvocation: tutor-api

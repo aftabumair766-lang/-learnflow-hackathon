@@ -1,0 +1,56 @@
+---
+# Dapr Infrastructure Specification
+specVersion: "1.0"
+component: dapr
+type: service-mesh
+
+# Component Identity
+metadata:
+  name: dapr
+  description: "Distributed Application Runtime"
+  namespace: dapr-system
+
+# Deployment
+deployment:
+  method: dapr-cli
+  command: dapr init -k
+  version: "1.12+"
+
+# Components
+components:
+  - name: kafka-pubsub
+    type: pubsub.kafka
+    version: v1
+    spec:
+      metadata:
+        - name: brokers
+          value: kafka.kafka.svc.cluster.local:9092
+        - name: authType
+          value: none
+        - name: consumerGroup
+          value: default-group
+
+  - name: postgres-state
+    type: state.postgresql
+    version: v1
+    spec:
+      metadata:
+        - name: connectionString
+          value: "host=postgres.learnflow.svc.cluster.local user=postgres password=postgres dbname=state_db"
+
+# Verification
+verification:
+  - check: Dapr control plane pods Running
+    command: kubectl get pods -n dapr-system
+  - check: Dapr operator Running
+    command: kubectl get deploy -n dapr-system dapr-operator
+  - check: Dapr sidecar-injector Running
+    command: kubectl get deploy -n dapr-system dapr-sidecar-injector
+
+# Dependencies
+dependencies:
+  - kafka (for pub/sub component)
+  - postgresql (for state management)
+
+# Skill
+deployedBy: dapr-k8s-init
